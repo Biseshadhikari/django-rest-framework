@@ -1,13 +1,152 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Todo CRUD</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
 </head>
 <body>
-    {%for i in sss%}
-   
-        <h1> {{i}}</h1>
-    {%endfor%}
+    <h1>Todo List</h1>
+    <div id="message"></div>
+    <ul id="todolist"></ul>
+    
+    <h2>Create Todo</h2>
+    <input type="text" id="newTodo" placeholder="Enter new todo">
+    <button onclick="createTodo()">Add Todo</button>
+    
+    <h2>Update Todo</h2>
+    <input type="number" id="updateId" placeholder="Enter ID to update" hidden>
+    <input type="text" id="updateTodo" placeholder="Enter updated todo">
+    <input type="checkbox" id="updateCompleted"> Completed
+    <button onclick="updateTodo()">Update Todo</button>
+
+    <script>
+        // Fetch and display all todos
+        function fetchTodos() {
+            fetch('/home/')
+                .then(response => response.json())
+                .then(data => {
+                    const todolist = document.getElementById('todolist');
+                    todolist.innerHTML = '';
+                    data.forEach(todo => {
+                        const li = document.createElement('li');
+                        li.textContent = `${todo.title} - ${todo.is_completed ? 'Completed' : 'Pending'}`;
+                        
+                        // Create update button
+                        const updateBtn = document.createElement('button');
+                        updateBtn.textContent = 'Update';
+                        updateBtn.onclick = () => populateUpdateForm(todo);
+                        
+                        // Create delete button
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Delete';
+                        deleteBtn.onclick = () => deleteTodo(todo.id);
+                        
+                        li.appendChild(updateBtn);
+                        li.appendChild(deleteBtn);
+                        todolist.appendChild(li);
+                    });
+                })
+                .catch(error => showMessage('Error fetching todos', 'error'));
+        }
+
+        // Create a new todo
+        function getCSRFToken() {
+            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        }
+
+        function createTodo() {
+            const newTodo = document.getElementById('newTodo').value;
+
+            fetch('/createTodo', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ title: newTodo, is_completed: false })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Todo saved successfully', 'success');
+                    fetchTodos();
+                } else {
+                    showMessage('Error saving todo', 'error');
+                }
+            })
+            .catch(error => showMessage('Error: ' + error.message, 'error'));
+        }
+
+        // Update an existing todo
+        function updateTodo() {
+            const updateId = document.getElementById('updateId').value;
+            const updateTodo = document.getElementById('updateTodo').value;
+            const isCompleted = document.getElementById('updateCompleted').checked;
+
+            fetch(`/updateTodo/${updateId}/`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ title: updateTodo, is_completed: isCompleted })
+            })
+            .then(response => response.json())
+            .then(data => {
+                
+                showMessage('Todo updated successfully', 'success');
+                fetchTodos();
+                document.getElementById('updateId').value = "";
+                document.getElementById('updateTodo').value = "";
+                document.getElementById('updateCompleted').checked = false; 
+                
+            })
+            .catch(error => showMessage('Error: ' + error.message, 'error'));
+        }
+
+        // Populate update form with todo data
+        function populateUpdateForm(todo) {
+            document.getElementById('updateId').value = todo.id;
+            document.getElementById('updateTodo').value = todo.title;
+            document.getElementById('updateCompleted').checked = todo.is_completed; 
+        }
+
+        // Delete a todo
+        function deleteTodo(id) {
+            fetch(`/deleteTodo/${id}/`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Todo deleted successfully', 'success');
+                    fetchTodos();
+                } else {
+                    showMessage('Error deleting todo', 'error');
+                }
+            })
+            .catch(error => showMessage('Error: ' + error.message, 'error'));
+        }
+
+        // Show messages for different operations
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.style.color = type === 'success' ? 'green' : 'red';
+
+            setTimeout(() => {
+                messageDiv.textContent = '';
+            }, 3000);
+        }
+
+        // Initial fetch
+        fetchTodos();
+    </script>
 </body>
 </html>
